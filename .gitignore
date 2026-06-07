@@ -1,0 +1,24 @@
+# Virtual environment
+venv/
+
+# Environment variables - NEVER commit this
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Mac garbage
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Pytest
+.pytest_cache/
+
+# Egg info
+*.egg-info/
+dist/
+build/
