@@ -2,17 +2,16 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.api import bookings  # ← add this
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     settings = get_settings()
     db = get_db()
     print(f"🚀 App starting in {settings.APP_ENV} mode")
     print(f"✅ Supabase connected: {settings.SUPABASE_URL}")
     yield
-    # Shutdown
     print("🛑 App shutting down")
 
 
@@ -23,6 +22,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.include_router(bookings.router)  # ← add this
+
 
 @app.get("/health")
 def health_check():
@@ -31,4 +32,3 @@ def health_check():
         "app": "appointment-bot",
         "env": get_settings().APP_ENV
     }
-
