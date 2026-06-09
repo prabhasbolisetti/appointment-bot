@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.api import bookings  # ← add this
+from app.api import bookings, whatsapp
 
 
 @asynccontextmanager
@@ -22,7 +22,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-app.include_router(bookings.router)  # ← add this
+app.include_router(bookings.router)
+app.include_router(whatsapp.router)
 
 
 @app.get("/health")
