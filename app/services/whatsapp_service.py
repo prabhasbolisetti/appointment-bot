@@ -1,5 +1,9 @@
+import json
+import logging
 import httpx
 from app.core.config import get_settings
+
+logger = logging.getLogger("appointment.whatsapp")
 
 
 def _get_headers():
@@ -15,6 +19,37 @@ def _get_url():
     return f"https://graph.facebook.com/v19.0/{settings.WHATSAPP_PHONE_NUMBER_ID}/messages"
 
 
+def _mask_headers_for_log(headers: dict) -> dict:
+    h = dict(headers)
+    if "Authorization" in h:
+        h["Authorization"] = "<REDACTED>"
+    return h
+
+
+async def _post(to: str, payload: dict):
+    url = _get_url()
+    headers = _get_headers()
+    try:
+        logger.debug("📤 Sending POST to WhatsApp API URL: %s", url)
+        logger.debug("📤 Request headers: %s", json.dumps(_mask_headers_for_log(headers), indent=2))
+        logger.debug("📤 Request payload: %s", json.dumps(payload, indent=2))
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+
+        # Try to log response body safely
+        try:
+            resp_text = response.text
+            logger.info("📤 Response %s: %s", response.status_code, resp_text)
+        except Exception:
+            logger.info("📤 Response %s (no body)", response.status_code)
+
+        return response
+    except Exception as e:
+        logger.exception("Failed to send message to WhatsApp API: %s", e)
+        raise
+
+
 async def send_text(to: str, message: str):
     payload = {
         "messaging_product": "whatsapp",
@@ -22,14 +57,7 @@ async def send_text(to: str, message: str):
         "type": "text",
         "text": {"body": message}
     }
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            _get_url(),
-            headers=_get_headers(),
-            json=payload
-        )
-        print(f"📤 Sent to {to}: {response.status_code}")
-        return response
+    return await _post(to, payload)
 
 
 async def send_main_menu(to: str):
@@ -40,7 +68,7 @@ async def send_main_menu(to: str):
         "interactive": {
             "type": "button",
             "body": {
-                "text": "👋 Welcome to Sunrise Health Clinic!\n\nHow can I help you today?"
+                "text": "👋 Welcome to Sunrise Health Clinic!\\n\\nHow can I help you today?"
             },
             "action": {
                 "buttons": [
@@ -51,13 +79,7 @@ async def send_main_menu(to: str):
             }
         }
     }
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            _get_url(),
-            headers=_get_headers(),
-            json=payload
-        )
-        return response
+    return await _post(to, payload)
 
 
 async def send_slots_list(to: str, slots: list):
@@ -76,7 +98,7 @@ async def send_slots_list(to: str, slots: list):
         "type": "interactive",
         "interactive": {
             "type": "list",
-            "body": {"text": "🗓️ Available slots for tomorrow.\n\nSelect a time:"},
+            "body": {"text": "🗓️ Available slots for tomorrow.\\n\\nSelect a time:"},
             "action": {
                 "button": "View Slots",
                 "sections": [
@@ -88,13 +110,7 @@ async def send_slots_list(to: str, slots: list):
             }
         }
     }
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            _get_url(),
-            headers=_get_headers(),
-            json=payload
-        )
-        return response
+    return await _post(to, payload)
 
 
 async def handle_text_message(from_number: str, text: str):
@@ -116,12 +132,12 @@ async def handle_button_reply(from_number: str, button_id: str):
     elif button_id == "CLINIC_TIMINGS":
         await send_text(
             from_number,
-            "🕐 *Clinic Timings*\n\nMonday – Saturday\n9:00 AM – 5:00 PM\n\nSunday: Closed"
+            "🕐 *Clinic Timings*\\n\\nMonday – Saturday\\n9:00 AM – 5:00 PM\\n\\nSunday: Closed"
         )
     elif button_id == "CLINIC_LOCATION":
         await send_text(
             from_number,
-            "📍 *Location*\n\n12-3, MG Road, Bhimavaram, AP 534202\n\nhttps://maps.google.com/?q=Bhimavaram"
+            "📍 *Location*\\n\\n12-3, MG Road, Bhimavaram, AP 534202\\n\\nhttps://maps.google.com/?q=Bhimavaram"
         )
 
 

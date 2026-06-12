@@ -3,16 +3,29 @@ from contextlib import asynccontextmanager
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.api import bookings, whatsapp
+import logging
+
+
+# Configure basic logging for the application. This ensures our module loggers
+# (appointment.whatsapp) and other libraries emit to stdout when running.
+def _configure_logging():
+    settings = get_settings()
+    level = logging.DEBUG if settings.APP_ENV == "development" else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _configure_logging()
     settings = get_settings()
     db = get_db()
-    print(f"🚀 App starting in {settings.APP_ENV} mode")
-    print(f"✅ Supabase connected: {settings.SUPABASE_URL}")
+    logging.getLogger("appointment.whatsapp").info(f"🚀 App starting in {settings.APP_ENV} mode")
+    logging.getLogger("appointment.whatsapp").info(f"✅ Supabase connected: {settings.SUPABASE_URL}")
     yield
-    print("🛑 App shutting down")
+    logging.getLogger("appointment.whatsapp").info("🛑 App shutting down")
 
 
 app = FastAPI(
