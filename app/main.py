@@ -5,7 +5,15 @@ import logging
 
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.api import bookings, whatsapp, admin_auth
+
+from app.api import (
+    bookings,
+    whatsapp,
+    admin_auth,
+    clinic,
+    appointments,
+    patients,
+)
 
 
 def configure_logging():
@@ -33,7 +41,7 @@ async def lifespan(app: FastAPI):
     logger = logging.getLogger("appointment")
 
     logger.info(f"🚀 App starting in {settings.APP_ENV} mode")
-    logger.info("✅ Supabase connection initialized")
+    logger.info(f"✅ Supabase connected: {settings.SUPABASE_URL}")
 
     yield
 
@@ -52,6 +60,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -62,6 +71,9 @@ app.add_middleware(
 app.include_router(bookings.router)
 app.include_router(whatsapp.router)
 app.include_router(admin_auth.router)
+app.include_router(clinic.router)
+app.include_router(appointments.router)
+app.include_router(patients.router)
 
 
 @app.get("/")
