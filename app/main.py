@@ -6,6 +6,8 @@ import logging
 from app.core.config import get_settings
 from app.core.database import get_db
 
+from app.api import bookings, whatsapp, admin_auth, clinic, appointments, patients
+
 from app.api import (
     bookings,
     whatsapp,
@@ -13,6 +15,7 @@ from app.api import (
     clinic,
     appointments,
     patients,
+    slots,
 )
 
 
@@ -74,6 +77,7 @@ app.include_router(admin_auth.router)
 app.include_router(clinic.router)
 app.include_router(appointments.router)
 app.include_router(patients.router)
+app.include_router(slots.router)
 
 
 @app.get("/")
