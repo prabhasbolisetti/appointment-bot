@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_NUMBER_ID: str = ""
     WEBHOOK_VERIFY_TOKEN: str
 
+    # SendGrid
+    SENDGRID_API_KEY: str = ""
+    SENDER_EMAIL: str = "noreply@example.com"
+
     # App
     APP_ENV: str = "development"
 

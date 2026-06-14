@@ -14,6 +14,8 @@ from app.api import (
     appointments,
     patients,
     slots,
+    email_settings,
+    payments,
 )
 
 
@@ -76,6 +78,8 @@ app.include_router(clinic.router)
 app.include_router(appointments.router)
 app.include_router(patients.router)
 app.include_router(slots.router)
+app.include_router(email_settings.router)
+app.include_router(payments.router)
 
 
 @app.get("/")
