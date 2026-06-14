@@ -10,6 +10,8 @@ class SlotResponse(BaseModel):
     slot_date: date
     start_time: time
     status: str
+    held_by: Optional[UUID] = None
+    held_until: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -18,6 +20,15 @@ class SlotResponse(BaseModel):
 class HoldSlotRequest(BaseModel):
     slot_id: UUID
     patient_whatsapp: str
+
+
+class CreateSlotsRequest(BaseModel):
+    clinic_id: UUID
+    start_date: date
+    end_date: date
+    open_time: time
+    close_time: time
+    slot_duration_minutes: int
 
 
 class HoldSlotResponse(BaseModel):

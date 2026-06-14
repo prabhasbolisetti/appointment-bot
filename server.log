@@ -1,0 +1,8 @@
+INFO:     Will watch for changes in these directories: ['/Users/bolisettiprabhas/Desktop/appointment_bot']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [29961] using WatchFiles
+INFO:     Started server process [29964]
+INFO:     Waiting for application startup.
+2026-06-14 14:12:04,642 INFO appointment: 🚀 App starting in development mode
+2026-06-14 14:12:04,642 INFO appointment: ✅ Supabase connected: https://hyvyltwuevnokdwyxnxa.supabase.co
+INFO:     Application startup complete.

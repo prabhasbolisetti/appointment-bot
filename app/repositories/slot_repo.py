@@ -180,28 +180,6 @@ def bulk_create_slots(
 
     response = db.table("slots").insert(to_insert_filtered).execute()
     return len(response.data) if response.data else 0
-            .select("slot_date, start_time")
-            .eq("clinic_id", clinic_id)
-            .gte("slot_date", start_date.isoformat())
-            .lte("slot_date", end_date.isoformat())
-            .execute()
-        )
-        existing = set()
-        if existing_resp and existing_resp.data:
-            for r in existing_resp.data:
-                existing.add((r["slot_date"], r["start_time"]))
-
-        filtered = [s for s in slots_to_insert if (s["slot_date"], s["start_time"]) not in existing]
-
-        if not filtered:
-            return 0
-
-        response = db.table("slots").insert(filtered).execute()
-        return len(response.data) if response.data else 0
-    except Exception:
-        # Fall back to attempt an insert and let the caller see an exception
-        response = db.table("slots").insert(slots_to_insert).execute()
-        return len(response.data) if response.data else 0
 
 
 def delete_slot(slot_id: str) -> bool:
