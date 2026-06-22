@@ -23,16 +23,15 @@ from app.api import (
 def configure_logging():
     settings = get_settings()
 
-    level = (
-        logging.DEBUG
-        if settings.APP_ENV == "development"
-        else logging.INFO
-    )
-
     logging.basicConfig(
-        level=level,
+        level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    logging.getLogger("appointment").setLevel(
+        logging.DEBUG if settings.APP_ENV == "development" else logging.INFO
+    )
+    for logger_name in ("httpcore", "httpx", "hpack", "postgrest", "supabase"):
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
 @asynccontextmanager
