@@ -23,6 +23,44 @@ def get_or_create_patient(whatsapp_number: str) -> dict:
     return new_patient.data[0]
 
 
+def get_patient_by_whatsapp(whatsapp_number: str) -> dict:
+    db = get_db()
+    response = (
+        db.table("patients")
+        .select("*")
+        .eq("whatsapp_number", whatsapp_number)
+        .execute()
+    )
+    return response.data[0] if response.data and len(response.data) > 0 else None
+
+
+def update_patient(patient_id: str, data: dict) -> dict:
+    db = get_db()
+    clean_data = {key: value for key, value in data.items() if value is not None}
+    if not clean_data:
+        return get_patient_by_id(patient_id)
+
+    response = (
+        db.table("patients")
+        .update(clean_data)
+        .eq("id", patient_id)
+        .execute()
+    )
+    return response.data[0] if response.data else None
+
+
+def get_patient_by_id(patient_id: str) -> dict:
+    db = get_db()
+    response = (
+        db.table("patients")
+        .select("*")
+        .eq("id", patient_id)
+        .single()
+        .execute()
+    )
+    return response.data if response.data else None
+
+
 def update_conversation_state(patient_id: str, state: str, state_data: dict = None) -> None:
     db = get_db()
     payload = {"conversation_state": state}

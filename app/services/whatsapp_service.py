@@ -114,6 +114,11 @@ async def send_slots_list(to: str, slots: list):
 
 
 async def handle_text_message(from_number: str, text: str):
+    from app.services.slot_service import handle_patient_detail_reply
+
+    if await handle_patient_detail_reply(from_number, text):
+        return
+
     greetings = ["hi", "hello", "hey", "start", "menu"]
     if any(g in text for g in greetings):
         await send_main_menu(from_number)

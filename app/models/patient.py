@@ -13,7 +13,10 @@ class PatientResponse(BaseModel):
     id: UUID
     whatsapp_number: str
     name: Optional[str]
+    email: Optional[str] = None
+    age: Optional[int] = None
     conversation_state: str
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

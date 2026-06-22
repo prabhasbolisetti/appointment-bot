@@ -1,211 +1,180 @@
+import html
+import logging
+
 try:
     from sendgrid import SendGridAPIClient
-    from sendgrid.helpers.mail import Mail, Email, To
+    from sendgrid.helpers.mail import Mail
     SENDGRID_AVAILABLE = True
 except Exception:
     SENDGRID_AVAILABLE = False
 
 from app.core.config import get_settings
-import logging
 
 logger = logging.getLogger(__name__)
 
 
-def send_booking_confirmation_email(patient_email: str, patient_name: str, clinic_name: str, slot_date: str, slot_time: str) -> bool:
-    """Send booking confirmation email"""
+def _send_email(from_email: str, to_email: str, subject: str, html_content: str) -> bool:
     settings = get_settings()
-    
+
+    if not to_email:
+        logger.info("Email skipped because recipient is empty")
+        return False
     if not settings.SENDGRID_API_KEY:
         logger.warning("SendGrid API key not configured")
         return False
     if not SENDGRID_AVAILABLE:
         logger.warning("sendgrid package not installed; email disabled")
         return False
-    
+
     try:
         message = Mail(
-            from_email=settings.SENDER_EMAIL,
-            to_emails=patient_email,
-            subject=f"Appointment Confirmed - {clinic_name}",
-            html_content=f"""
-            <h2>Appointment Confirmed!</h2>
-            <p>Hello {patient_name},</p>
-            <p>Your appointment has been confirmed at <strong>{clinic_name}</strong>.</p>
-            
-            <div style="background-color: #f0f0f0; padding: 20px; border-radius: 5px;">
-                <p><strong>Date:</strong> {slot_date}</p>
-                <p><strong>Time:</strong> {slot_time}</p>
-                <p><strong>Clinic:</strong> {clinic_name}</p>
-            </div>
-            
-            <p>Please arrive 10 minutes early. If you need to cancel or reschedule, reply to this email or contact us on WhatsApp.</p>
-            
-            <p>Thank you,<br>{clinic_name}</p>
-            """
+            from_email=from_email or settings.SENDER_EMAIL,
+            to_emails=to_email,
+            subject=subject,
+            html_content=html_content,
         )
-        
-        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-        response = sg.send(message)
-        
-        logger.info(f"Booking confirmation email sent to {patient_email}")
+        response = SendGridAPIClient(settings.SENDGRID_API_KEY).send(message)
         return response.status_code == 202
-    except Exception as e:
-        logger.error(f"Failed to send booking confirmation email: {e}")
+    except Exception as exc:
+        logger.error("Failed to send email to %s: %s", to_email, exc)
         return False
 
 
-def send_appointment_reminder_email(patient_email: str, patient_name: str, clinic_name: str, slot_date: str, slot_time: str) -> bool:
-    """Send appointment reminder email"""
+def _appointment_parts(appointment: dict) -> tuple[dict, dict, dict]:
+    patient = appointment.get("patients") or {}
+    slot = appointment.get("slots") or {}
+    clinic = appointment.get("clinics") or {}
+    return patient, slot, clinic
+
+
+def send_patient_booking_email(appointment: dict) -> bool:
     settings = get_settings()
-    
-    if not settings.SENDGRID_API_KEY:
-        logger.warning("SendGrid API key not configured")
-        return False
-    if not SENDGRID_AVAILABLE:
-        logger.warning("sendgrid package not installed; email disabled")
-        return False
-    
-    try:
-        message = Mail(
-            from_email=settings.SENDER_EMAIL,
-            to_emails=patient_email,
-            subject=f"Appointment Reminder - {clinic_name}",
-            html_content=f"""
-            <h2>Appointment Reminder</h2>
-            <p>Hello {patient_name},</p>
-            <p>This is a reminder that you have an appointment coming up at <strong>{clinic_name}</strong>.</p>
-            
-            <div style="background-color: #f0f0f0; padding: 20px; border-radius: 5px;">
-                <p><strong>Date:</strong> {slot_date}</p>
-                <p><strong>Time:</strong> {slot_time}</p>
-                <p><strong>Clinic:</strong> {clinic_name}</p>
-            </div>
-            
-            <p>Please confirm your attendance or let us know if you need to reschedule.</p>
-            
-            <p>Thank you,<br>{clinic_name}</p>
-            """
-        )
-        
-        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-        response = sg.send(message)
-        
-        logger.info(f"Reminder email sent to {patient_email}")
-        return response.status_code == 202
-    except Exception as e:
-        logger.error(f"Failed to send reminder email: {e}")
-        return False
+    patient, slot, clinic = _appointment_parts(appointment)
+    patient_email = patient.get("email")
+    patient_name = patient.get("name") or "Patient"
+    clinic_name = clinic.get("name") or "Clinic"
+    clinic_phone = settings.CLINIC_PHONE or "the clinic"
+
+    subject = f"Appointment Confirmed - {clinic_name}"
+    body = f"""
+    <h2>Appointment Confirmed</h2>
+    <p>Hello {html.escape(patient_name)},</p>
+    <p>Your appointment at <strong>{html.escape(clinic_name)}</strong> is confirmed.</p>
+    <div style="background:#f6f8fa;padding:16px;border-radius:6px">
+      <p><strong>Date:</strong> {html.escape(str(slot.get("slot_date", "")))}</p>
+      <p><strong>Time:</strong> {html.escape(str(slot.get("start_time", ""))[:5])}</p>
+      <p><strong>Clinic:</strong> {html.escape(clinic_name)}</p>
+      <p><strong>Contact:</strong> {html.escape(clinic_phone)}</p>
+    </div>
+    <p>Please arrive 10 minutes early.</p>
+    <p>Regards,<br>{html.escape(clinic_name)}</p>
+    """
+
+    sent = _send_email(
+        from_email=settings.CLINIC_EMAIL or settings.SENDER_EMAIL,
+        to_email=patient_email,
+        subject=subject,
+        html_content=body,
+    )
+    if sent:
+        logger.info("Patient booking email sent to %s", patient_email)
+    return sent
 
 
-def send_cancellation_email(patient_email: str, patient_name: str, clinic_name: str, slot_date: str, slot_time: str) -> bool:
-    """Send appointment cancellation email"""
+def send_admin_booking_notification(appointment: dict) -> bool:
     settings = get_settings()
-    
-    if not settings.SENDGRID_API_KEY:
-        logger.warning("SendGrid API key not configured")
-        return False
-    if not SENDGRID_AVAILABLE:
-        logger.warning("sendgrid package not installed; email disabled")
-        return False
-    
-    try:
-        message = Mail(
-            from_email=settings.SENDER_EMAIL,
-            to_emails=patient_email,
-            subject=f"Appointment Cancelled - {clinic_name}",
-            html_content=f"""
-            <h2>Appointment Cancelled</h2>
-            <p>Hello {patient_name},</p>
-            <p>Your appointment at <strong>{clinic_name}</strong> has been cancelled.</p>
-            
-            <div style="background-color: #f0f0f0; padding: 20px; border-radius: 5px;">
-                <p><strong>Date:</strong> {slot_date}</p>
-                <p><strong>Time:</strong> {slot_time}</p>
-                <p><strong>Clinic:</strong> {clinic_name}</p>
-            </div>
-            
-            <p>If this was unexpected, please contact us to rebook your appointment.</p>
-            
-            <p>Thank you,<br>{clinic_name}</p>
-            """
-        )
-        
-        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-        response = sg.send(message)
-        
-        logger.info(f"Cancellation email sent to {patient_email}")
-        return response.status_code == 202
-    except Exception as e:
-        logger.error(f"Failed to send cancellation email: {e}")
-        return False
+    patient, slot, clinic = _appointment_parts(appointment)
+    clinic_name = clinic.get("name") or "Clinic"
+
+    subject = f"[{clinic_name}] New paid appointment"
+    body = f"""
+    <h2>New Paid Appointment</h2>
+    <div style="background:#f6f8fa;padding:16px;border-radius:6px">
+      <p><strong>Patient:</strong> {html.escape(patient.get("name") or "N/A")}</p>
+      <p><strong>Age:</strong> {html.escape(str(patient.get("age") or "N/A"))}</p>
+      <p><strong>Phone:</strong> {html.escape(patient.get("whatsapp_number") or "N/A")}</p>
+      <p><strong>Email:</strong> {html.escape(patient.get("email") or "N/A")}</p>
+      <p><strong>Date:</strong> {html.escape(str(slot.get("slot_date", "")))}</p>
+      <p><strong>Time:</strong> {html.escape(str(slot.get("start_time", ""))[:5])}</p>
+      <p><strong>Complaint/Notes:</strong> {html.escape(appointment.get("complaint_notes") or "N/A")}</p>
+    </div>
+    """
+
+    sent = _send_email(
+        from_email=settings.SENDER_EMAIL,
+        to_email=settings.DEVELOPER_EMAIL,
+        subject=subject,
+        html_content=body,
+    )
+    if sent:
+        logger.info("Admin booking notification sent to %s", settings.DEVELOPER_EMAIL)
+    return sent
+
+
+def send_appointment_reminder_email(appointment: dict) -> bool:
+    settings = get_settings()
+    patient, slot, clinic = _appointment_parts(appointment)
+    patient_email = patient.get("email")
+    patient_name = patient.get("name") or "Patient"
+    clinic_name = clinic.get("name") or "Clinic"
+
+    subject = f"Appointment Reminder - {clinic_name}"
+    body = f"""
+    <h2>Appointment Reminder</h2>
+    <p>Hello {html.escape(patient_name)},</p>
+    <p>This is a reminder for your appointment at <strong>{html.escape(clinic_name)}</strong>.</p>
+    <div style="background:#f6f8fa;padding:16px;border-radius:6px">
+      <p><strong>Date:</strong> {html.escape(str(slot.get("slot_date", "")))}</p>
+      <p><strong>Time:</strong> {html.escape(str(slot.get("start_time", ""))[:5])}</p>
+      <p><strong>Contact:</strong> {html.escape(settings.CLINIC_PHONE or "")}</p>
+    </div>
+    <p>Regards,<br>{html.escape(clinic_name)}</p>
+    """
+
+    sent = _send_email(
+        from_email=settings.CLINIC_EMAIL or settings.SENDER_EMAIL,
+        to_email=patient_email,
+        subject=subject,
+        html_content=body,
+    )
+    if sent:
+        logger.info("Reminder email sent to %s", patient_email)
+    return sent
+
+
+def send_cancellation_email(
+    patient_email: str,
+    patient_name: str,
+    clinic_name: str,
+    slot_date: str,
+    slot_time: str,
+) -> bool:
+    settings = get_settings()
+    body = f"""
+    <h2>Appointment Cancelled</h2>
+    <p>Hello {html.escape(patient_name or "Patient")},</p>
+    <p>Your appointment at <strong>{html.escape(clinic_name)}</strong> has been cancelled.</p>
+    <p><strong>Date:</strong> {html.escape(slot_date)}</p>
+    <p><strong>Time:</strong> {html.escape(slot_time[:5])}</p>
+    """
+    return _send_email(
+        from_email=settings.CLINIC_EMAIL or settings.SENDER_EMAIL,
+        to_email=patient_email,
+        subject=f"Appointment Cancelled - {clinic_name}",
+        html_content=body,
+    )
 
 
 def send_refund_email(patient_email: str, patient_name: str, clinic_name: str, amount: float) -> bool:
-    """Send refund notification email"""
     settings = get_settings()
-    
-    if not settings.SENDGRID_API_KEY:
-        logger.warning("SendGrid API key not configured")
-        return False
-    if not SENDGRID_AVAILABLE:
-        logger.warning("sendgrid package not installed; email disabled")
-        return False
-    
-    try:
-        message = Mail(
-            from_email=settings.SENDER_EMAIL,
-            to_emails=patient_email,
-            subject=f"Refund Processed - {clinic_name}",
-            html_content=f"""
-            <h2>Refund Processed</h2>
-            <p>Hello {patient_name},</p>
-            <p>We have processed a refund for your appointment at <strong>{clinic_name}</strong>.</p>
-            
-            <div style="background-color: #f0f0f0; padding: 20px; border-radius: 5px;">
-                <p><strong>Refund Amount:</strong> ₹{amount:.2f}</p>
-                <p>The refund will be credited to your original payment method within 3-5 business days.</p>
-            </div>
-            
-            <p>If you have any questions, please contact us.</p>
-            
-            <p>Thank you,<br>{clinic_name}</p>
-            """
-        )
-        
-        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-        response = sg.send(message)
-        
-        logger.info(f"Refund email sent to {patient_email}")
-        return response.status_code == 202
-    except Exception as e:
-        logger.error(f"Failed to send refund email: {e}")
-        return False
-
-
-def send_admin_notification(admin_email: str, clinic_name: str, subject: str, message: str) -> bool:
-    """Send notification to admin"""
-    settings = get_settings()
-    
-    if not settings.SENDGRID_API_KEY:
-        logger.warning("SendGrid API key not configured")
-        return False
-    if not SENDGRID_AVAILABLE:
-        logger.warning("sendgrid package not installed; email disabled")
-        return False
-    
-    try:
-        email = Mail(
-            from_email=settings.SENDER_EMAIL,
-            to_emails=admin_email,
-            subject=f"[{clinic_name}] {subject}",
-            html_content=f"<p>{message}</p>"
-        )
-        
-        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-        response = sg.send(email)
-        
-        logger.info(f"Admin notification sent to {admin_email}")
-        return response.status_code == 202
-    except Exception as e:
-        logger.error(f"Failed to send admin notification: {e}")
-        return False
+    body = f"""
+    <h2>Refund Processed</h2>
+    <p>Hello {html.escape(patient_name or "Patient")},</p>
+    <p>Your refund for <strong>Rs. {amount:.2f}</strong> has been processed.</p>
+    """
+    return _send_email(
+        from_email=settings.CLINIC_EMAIL or settings.SENDER_EMAIL,
+        to_email=patient_email,
+        subject=f"Refund Processed - {clinic_name}",
+        html_content=body,
+    )

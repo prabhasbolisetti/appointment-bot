@@ -20,10 +20,13 @@ class SlotResponse(BaseModel):
 class HoldSlotRequest(BaseModel):
     slot_id: UUID
     patient_whatsapp: str
+    patient_name: Optional[str] = None
+    patient_email: Optional[str] = None
+    patient_age: Optional[int] = None
+    complaint_notes: Optional[str] = None
 
 
 class CreateSlotsRequest(BaseModel):
-    clinic_id: UUID
     start_date: date
     end_date: date
     open_time: time

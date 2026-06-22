@@ -82,6 +82,7 @@ def complete_appointment(appointment_id: str) -> dict:
 
 def request_refund(appointment_id: str) -> dict:
     """Request refund for appointment (requires Razorpay integration)"""
+    from app.services import payment_service
 
     appointment = appointment_repo.get_appointment_with_details(
         appointment_id
@@ -109,10 +110,9 @@ def request_refund(appointment_id: str) -> dict:
             "message": "Payment record not found"
         }
 
-    appointment_repo.update_appointment_payment_status(
-        appointment_id,
-        "refunded"
-    )
+    refund = payment_service.refund_payment(appointment_id)
+    if not refund["success"]:
+        return refund
 
     appointment_repo.update_appointment_status(
         appointment_id,
@@ -122,7 +122,8 @@ def request_refund(appointment_id: str) -> dict:
     return {
         "success": True,
         "message": "Refund processed",
-        "razorpay_order_id": payment.get("razorpay_order_id")
+        "razorpay_order_id": payment.get("razorpay_order_id"),
+        "refund_id": refund.get("refund_id"),
     }
 
 
