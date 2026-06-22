@@ -1,20 +1,21 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.workers.background_jobs import start_background_jobs, stop_background_jobs
 
 from app.api import (
+    auth,
     bookings,
     whatsapp,
-    admin_auth,
     clinic,
     appointments,
     patients,
     slots,
-    email_settings,
     payments,
 )
 
@@ -39,16 +40,19 @@ async def lifespan(app: FastAPI):
     configure_logging()
 
     settings = get_settings()
+    settings.validate_startup()
     get_db()
 
     logger = logging.getLogger("appointment")
 
-    logger.info(f"🚀 App starting in {settings.APP_ENV} mode")
-    logger.info(f"✅ Supabase connected: {settings.SUPABASE_URL}")
+    logger.info("App starting in %s mode", settings.APP_ENV)
+    logger.info("Supabase configured: %s", settings.SUPABASE_URL)
+    start_background_jobs()
 
     yield
 
-    logger.info("🛑 App shutting down")
+    stop_background_jobs()
+    logger.info("App shutting down")
 
 
 app = FastAPI(
@@ -61,25 +65,37 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=get_settings().cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Routers
+app.include_router(auth.router)
 app.include_router(bookings.router)
 app.include_router(whatsapp.router)
-app.include_router(admin_auth.router)
 app.include_router(clinic.router)
 app.include_router(appointments.router)
 app.include_router(patients.router)
 app.include_router(slots.router)
-app.include_router(email_settings.router)
 app.include_router(payments.router)
+
+
+@app.middleware("http")
+async def error_handling_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        logging.getLogger("appointment").exception(
+            "Unhandled error while processing %s %s",
+            request.method,
+            request.url.path,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
 
 
 @app.get("/")
